@@ -105,17 +105,39 @@ async function getIP() {
 
 // ===== 取得 LINE 使用者 =====
 async function updateUserInfo() {
-    await liff.init({ liffId: "2008521836-JWnRG66v" });
-    if(!liff.isLoggedIn()) liff.login();
 
-    const profile = await liff.getProfile();
+    document.getElementById("userInfo").textContent = "載入中…";
+
+    await liff.init({ liffId: "2008521836-JWnRG66v" });
+    await liff.ready;
+
+    // 未登入 → login 並 return（避免繼續往下跑造成 undefined）
+    if (!liff.isLoggedIn()) {
+        return liff.login();
+    }
+
+    // 取得使用者資料（避免 null / undefined）
+    let profile = null;
+    try {
+        profile = await liff.getProfile();
+    } catch (err) {
+        console.error("getProfile error", err);
+    }
+
+    // 如果 profile 還是拿不到 → 不允許打卡
+    if (!profile || !profile.userId) {
+        document.getElementById("userInfo").textContent = "無法取得您的 LINE 資料，請重新開啟此頁面";
+        return;
+    }
+
     window.userId = profile.userId;
     window.userName = profile.displayName;
 
+    document.getElementById("userInfo").textContent = `${profile.displayName} 您好`;
+
+    // 取得 IP 並顯示
     const ip = await getIP();
     const isCompany = COMPANY_IPS.includes(ip);
-
-    document.getElementById("userInfo").textContent = `${profile.displayName} 您好`;
 
     const statusEl = document.getElementById("statusInfo");
     statusEl.textContent = isCompany ? "公司網路" : "非公司網路";
