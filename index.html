@@ -11,7 +11,16 @@
 body { font-family: Arial; display:flex; flex-direction:column; align-items:center; margin:20px; }
 
 #userInfo { text-align:center; font-size:18px; margin-bottom:10px; }
-#statusInfo { text-align:center; font-size:16px; margin-bottom:20px; padding:5px 15px; border-radius:20px; display:inline-block; }
+#statusInfo { 
+    text-align:center; 
+    font-size:16px; 
+    margin-bottom:20px; 
+    padding:5px 15px; 
+    border-radius:20px; 
+    display:inline-block; 
+    font-weight:bold;
+    border:2px solid transparent; /* 預設邊框透明 */
+}
 
 .buttons-container {
     display:flex;
@@ -30,11 +39,10 @@ button {
     border-radius:8px; 
     cursor:pointer; 
     font-weight:bold; 
-    border:none;        /* 移除黑色邊框 */
+    border:none;        
     transition: all 0.2s ease;
 }
 
-/* 立體化效果 */
 button:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0,0,0,0.1);
@@ -44,7 +52,6 @@ button:active {
     box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
 
-/* 按鈕顏色漸層 */
 #btnStart { 
     background: linear-gradient(145deg, #3498db, #2980b9); 
     color:white; 
@@ -111,12 +118,10 @@ async function updateUserInfo() {
     await liff.init({ liffId: "2008521836-JWnRG66v" });
     await liff.ready;
 
-    // 未登入 → login 並 return（避免繼續往下跑造成 undefined）
     if (!liff.isLoggedIn()) {
         return liff.login();
     }
 
-    // 取得使用者資料（避免 null / undefined）
     let profile = null;
     try {
         profile = await liff.getProfile();
@@ -124,7 +129,6 @@ async function updateUserInfo() {
         console.error("getProfile error", err);
     }
 
-    // 如果 profile 還是拿不到 → 不允許打卡
     if (!profile || !profile.userId) {
         document.getElementById("userInfo").textContent = "無法取得您的 LINE 資料，請重新開啟此頁面";
         return;
@@ -135,14 +139,22 @@ async function updateUserInfo() {
 
     document.getElementById("userInfo").textContent = `${profile.displayName} 您好`;
 
-    // 取得 IP 並顯示
     const ip = await getIP();
     const isCompany = COMPANY_IPS.includes(ip);
 
     const statusEl = document.getElementById("statusInfo");
     statusEl.textContent = isCompany ? "公司網路" : "非公司網路";
-    statusEl.style.backgroundColor = isCompany ? "#d4f4dd" : "#f8d4d4";
-    statusEl.style.color = isCompany ? "green" : "red";
+
+    // ✅ 設定明顯顏色和橢圓框
+    if (isCompany) {
+        statusEl.style.backgroundColor = "#d4f4dd"; // 綠色背景
+        statusEl.style.color = "green";
+        statusEl.style.border = "2px solid green";
+    } else {
+        statusEl.style.backgroundColor = "#ffe4e1"; // 紅色背景
+        statusEl.style.color = "darkred";
+        statusEl.style.border = "2px solid darkred";
+    }
 }
 
 async function performClockIn(status, customDate="", customTime="", isMakeup=false) {
