@@ -146,6 +146,35 @@ async function updateUserInfo() {
 }
 
 async function performClockIn(status, customDate="", customTime="", isMakeup=false) {
+
+    // === 第 1 重防護：若 LINE 資料未準備好，阻止打卡 ===
+    if (!window.userId || !window.userName) {
+        Swal.fire({
+            icon: "info",
+            title: "請稍候",
+            html: "正在取得 LINE 使用者資料，請 1 秒後再試。",
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+        // 強制重新取一次
+        await updateUserInfo();
+
+        // 取完再檢查一次
+        if (!window.userId || !window.userName) {
+            Swal.fire({
+                icon: "error",
+                title: "無法取得 LINE 使用者資料",
+                html: "請重新開啟此打卡頁面。",
+                showConfirmButton: true
+            });
+            return;
+        }
+    }
+
+    // === 第 2 重防護：避免 userId 尚未準備好 ===
+    console.log("Clock-in user:", window.userId, window.userName);
+
     const ip = await getIP();
     const wrapper = document.getElementById("countdownWrapper");
     const circle = document.getElementById("circleProgress");
