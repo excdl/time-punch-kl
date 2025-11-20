@@ -6,127 +6,200 @@
 <title>奇可智能打卡系統</title>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
 <style>
-body { font-family: Arial; display:flex; flex-direction:column; align-items:center; margin:20px; }
-
-#dateTime { text-align:center; font-size:22px; margin-bottom:10px; }
-
-#userInfo { text-align:center; font-size:26px; margin-bottom:10px; }
-#statusInfo { text-align:center; font-size:23px; margin-bottom:20px; padding:5px 15px; border-radius:20px; display:inline-block; }
-
-.buttons-container {
-    display:flex;
-    flex-direction:row;
-    justify-content:space-between;
-    width:100%;
-    max-width:400px;
-    gap:10px;
+body { 
+    font-family: Arial; 
+    display:flex; 
+    justify-content:center; 
+    padding:20px; 
+    background:#f5f6fa;
+    margin:0;
 }
 
-/* 按鈕樣式 */
-button { 
-    flex:1; 
+/* 控制面板卡片 */
+#controlPanel {
+    background:white;
+    padding:25px 20px;
+    border-radius:15px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.1);
+    width:95%;
+    max-width:500px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+    align-items:center;
+    box-sizing:border-box;
+}
+
+/* 使用者資訊 */
+#userInfo { text-align:center; font-size:26px; font-weight:bold; }
+
+/* 狀態訊息 */
+#statusInfo { text-align:center; font-size:23px; padding:5px 15px; border-radius:20px; display:inline-block; }
+
+/* 日期時間 */
+#dateTime { text-align:center; font-size:22px; }
+
+/* 打卡按鈕區 */
+.buttons-container {
+    display:flex;
+    gap:10px;
+    width:100%;
+    flex-wrap:nowrap; /* 永不換行 */
+}
+.buttons-container button { 
+    flex:1 1 0; /* 平分寬度 */
+    min-width:80px;
     padding:10px 0; 
-    font-size:16px; 
+    font-size:25px; 
     border-radius:8px; 
     cursor:pointer; 
     font-weight:bold; 
     border:none;
+    white-space:nowrap; 
     transition: all 0.2s ease;
 }
-
-button:hover {
+.buttons-container button:hover{
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0,0,0,0.1);
 }
-button:active {
+.buttons-container button:active{
     transform: translateY(1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.08);
 }
-
-/* 按鈕顏色漸層 */
-#btnStart { 
-    background: linear-gradient(145deg, #3498db, #2980b9); 
-    color:white; 
-    box-shadow: 0 4px 8px rgba(52,152,219,0.3); 
-} 
-#btnEnd { 
-    background: linear-gradient(145deg, #2ecc71, #27ae60); 
-    color:white; 
-    box-shadow: 0 4px 8px rgba(46,204,113,0.3); 
-}   
-#btnMakeup { 
-    background: linear-gradient(145deg, #f39c12, #d35400); 
-    color:white; 
-    box-shadow: 0 4px 8px rgba(243,156,18,0.3); 
-} 
-
-#todayRecords { margin-top:20px; width:90%; border:1px solid #ccc; padding:10px; border-radius:8px; min-height:50px; }
+#btnStart { background: linear-gradient(145deg, #3498db, #2980b9); color:white; } 
+#btnEnd { background: linear-gradient(145deg, #2ecc71, #27ae60); color:white; }   
+#btnMakeup { background: linear-gradient(145deg, #f39c12, #d35400); color:white; } 
 
 /* 倒數動畫 */
-#countdownWrapper { margin-top:20px; width:120px; height:120px; position:relative; display:none; }
+#countdownWrapper { width:120px; height:120px; position:relative; display:none; }
 #circleProgress { fill:none; stroke-width:12; stroke-linecap:round; transform: rotate(-90deg); transform-origin: 50% 50%; }
 #countdownText { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight:bold; white-space:nowrap; }
 
-/* 補打卡彈窗 */
-.fade-item { opacity:0; transform:translateY(10px); }
+/* 查詢區塊 */
+#querySection { width:100%; display:flex; flex-direction:column; gap:10px; }
+#querySection .queryRow {
+    display:flex; 
+    gap:10px;
+    width:100%;
+    flex-wrap:nowrap; /* 永不換行 */
+    align-items:center;
+}
 
-/* Swal 樣式 */
-.swal2-popup-custom .swal2-title { font-size: 26px !important; font-weight: bold; }
-#makeupForm label { font-size: 19px !important; font-weight: bold; }
-.swal2-input-custom, .swal2-select-custom { width:100% !important; font-size:16px !important; padding:10px !important; }
-.swal2-confirm-custom, .swal2-cancel-custom { font-size:17px !important; padding:8px 20px !important; }
-.swal2-actions { width:100%; display:flex !important; justify-content:space-between !important; }
-.swal2-confirm-custom { background:#2ecc71 !important; color:white !important; }
-.swal2-cancel-custom { background:#3498db !important; color:white !important; }
+#querySection input[type="date"] {
+    flex:1 1 auto; /* 日期欄占剩餘空間 */
+    min-width:100px;
+    padding:8px 10px; 
+    font-size:14px; 
+    border-radius:6px; 
+    border:1px solid #ccc;
+    box-sizing:border-box;
+}
 
+#querySection button {
+    flex:1 1 0; /* 查詢和返回平分剩餘寬度 */
+    padding:8px 0;
+    font-size:14px;
+    font-weight:bold;
+    border-radius:6px;
+    border:none;
+    cursor:pointer;
+    white-space:nowrap;
+}
+
+#btnQuery { background:#d3d3d3; color:black; }  
+#btnReturn { background:#d3d3d3; color:black; }  
+
+#todayRecords {
+    border:1px solid #ccc; 
+    border-radius:8px; 
+    padding:10px; 
+    min-height:50px; 
+    font-size:16px; 
+    background: #fafafa;
+    width:100%; 
+    box-sizing:border-box;
+}
+
+/* 主管審批按鈕 */
+#btnApprove {
+    margin-top:10px;
+    padding:12px 20px;
+    font-size:18px;
+    font-weight:bold;
+    border-radius:10px;
+    background:linear-gradient(145deg,#8e44ad,#663399);
+    color:white;
+    display:none;
+    width:100%;
+    cursor:pointer;
+    border:none;
+}
+#btnApprove:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* 響應式文字縮放 */
+@media(max-width:400px){
+    .buttons-container button{
+        font-size:20px; /* 手機上文字縮小 */
+    }
+    #querySection input[type="date"]{
+        font-size:13px;
+    }
+    #querySection button{
+        font-size:13px;
+    }
+}
 </style>
 </head>
-
 <body>
-<div id="userInfo">正在獲取使用者資訊...</div>
-<div id="statusInfo"></div>
 
-<div id="dateTime">載入中…</div>
+<div id="controlPanel">
+    <div id="userInfo">正在獲取使用者資訊...</div>
+    <div id="statusInfo"></div>
+    <div id="dateTime">載入中…</div>
 
-<div class="buttons-container">
-    <button id="btnStart">上班</button>
-    <button id="btnEnd">下班</button>
-    <button id="btnMakeup">補打卡</button>
+    <!-- 打卡按鈕 -->
+    <div class="buttons-container">
+        <button id="btnStart">上班</button>
+        <button id="btnEnd">下班</button>
+        <button id="btnMakeup">補打卡</button>
+    </div>
+
+    <!-- 倒數動畫 -->
+    <div id="countdownWrapper">
+        <svg width="120" height="120">
+            <circle id="circleProgress" cx="60" cy="60" r="50"></circle>
+        </svg>
+        <div id="countdownText">打卡中...</div>
+    </div>
+
+    <!-- 查詢區塊 -->
+    <div id="querySection">
+        <div class="queryRow">
+            <input type="date" id="queryDate">
+            <button id="btnQuery" onclick="searchDateRecords()">查詢</button>
+            <button id="btnReturn" onclick="clearSearch()">返回</button>
+        </div>
+        <div id="todayRecords">今日打卡紀錄：</div>
+    </div>
+
+    <button id="btnApprove">補打卡審批</button>
 </div>
 
-<div id="countdownWrapper">
-    <svg width="120" height="120">
-        <circle id="circleProgress" cx="60" cy="60" r="50"></circle>
-    </svg>
-    <div id="countdownText">打卡中...</div>
-</div>
-
-<div id="todayRecords">今日打卡紀錄：</div>
-<!-- 主管審批按鈕 -->
-<button id="btnApprove"
-        style="
-            margin-top:20px;
-            padding:12px 20px;
-            font-size:18px;
-            font-weight:bold;
-            border-radius:10px;
-            background:linear-gradient(145deg,#8e44ad,#663399);
-            color:white;
-            display:none;
-            width:200px;
-        ">
-    補打卡審批
-</button>
 <script>
 // ===== 設定 =====
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxhQQ0Hr8WBp6-BHa_Y94i5kNc-G15Esz6mUdGGOV6oc1D57mLegt4ZrrAkEApdk3cr/exec";
-const COMPANY_IPS = ["43.226.232.126","43.227.24.78"];;
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxIGo5x-26GuWKWzhYIhLxEWcSmkSDpk_0M6g6vsT1Llpux17lpLc2QmeAC-euiyLGR/exec";
+const COMPANY_IPS = ["43.226.232.126","43.227.24.78"];
+    
 // ===== 主管 USER_ID（請填入你的主管 LINE userId）=====
 const MANAGERS = [
-    "U76174e2a9654ab2c7b1f037b28cb6c86","U7fdf4fbd467b9a93a23fac01ed03351b"
+    "U5362e40671c45e4c35629ff19163c414",
+    "U5362e40671c45e4c35629ff19163c414"
 ];
+
 
 // ===== 日期時間 =====
 function updateDateTime() {
@@ -179,7 +252,8 @@ async function updateUserInfo() {
     if (COMPANY_IPS.includes(ip)) {
         s.textContent = "公司網路";
         s.style.color = "#008000";               // 綠色文字
-        s.style.backgroundColor = "rgba(144,238,144,0.6)"; // 淺綠背景
+        s.style.backgroundColor = "rgba(144,238,144,0.6)";
+
     } else {
         s.textContent = "非公司網路";
         s.style.color = "#FF0000";               // 紅色文字
@@ -477,6 +551,10 @@ function fixTimeFormat(t) {
     }
     return t;
 }
+function clearSearch() {
+    document.getElementById("queryDate").value = "";
+    updateTodayRecords();  // 回到今日紀錄
+}
 
 // ===== 取得今日紀錄 =====
 async function updateTodayRecords() {
@@ -503,6 +581,43 @@ async function updateTodayRecords() {
     } catch(err) {
         console.error(err);
         document.getElementById("todayRecords").innerHTML = "今日打卡紀錄：讀取失敗";
+    }
+}
+// ===== 查詢指定日期 =====
+async function searchDateRecords() {
+    const dateInput = document.getElementById("queryDate").value;
+
+    if (!dateInput) {
+        // 沒有選日期 → 顯示今日紀錄
+        updateTodayRecords();
+        return;
+    }
+
+    // 轉成後端需要的 yyyy/MM/dd
+    const parts = dateInput.split("-");
+    const dateStr = `${parts[0]}/${parts[1]}/${parts[2]}`;
+
+    try {
+        const res = await fetch(`${API_ENDPOINT}?action=getDate&userId=${window.userId}&date=${dateStr}`);
+        const data = await res.json();
+
+        const container = document.getElementById("todayRecords");
+
+        if (!data.length) {
+            container.innerHTML = `${dateStr}：無紀錄`;
+            return;
+        }
+
+        container.innerHTML = `${dateStr} 打卡紀錄：<br>` + data.map(r => {
+            const time = fixTimeFormat(r.time);
+            const ipLabel = COMPANY_IPS.includes(r.ip) ? "(成功)" : "(錯誤-非公司網路異地請忽略)";
+            const makeup = r.isMakeup ? "(補打卡-待審核)" : "";
+            return `${r.status} ${time} ${ipLabel} ${makeup}`;
+        }).join("<br>");
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById("todayRecords").innerHTML = `${dateStr} 查詢失敗`;
     }
 }
 
@@ -569,7 +684,7 @@ document.getElementById("btnStart").onclick = () => performClockIn("上班");
 document.getElementById("btnEnd").onclick = () => performClockIn("下班");
 
 document.getElementById("btnApprove").onclick = () => {
-    window.location.href = "https://script.google.com/macros/s/AKfycbyxXrvVxfgwrI-SdXM03QEYxEpG-xqyjVQcxdNz1IBK3DtFC-kUFjHhRaNtgXNU-Mdu/exec";
+    window.location.href = "https://script.google.com/macros/s/AKfycbxaPziOwkI4ZSdM9jclAJNEEfk63B9hvzSc6Vb3occ0zOIgJBV0XYW8vMJm4KAM8HJE/exec";
 };
 
 // ===== 初始化 =====
@@ -581,9 +696,6 @@ window.onload = async () => {
 
 </body>
 </html>
-
-
-
 
 
 
