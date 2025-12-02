@@ -191,7 +191,7 @@ body {
 
 <script>
 // ===== 設定 =====
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxIGo5x-26GuWKWzhYIhLxEWcSmkSDpk_0M6g6vsT1Llpux17lpLc2QmeAC-euiyLGR/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyV-5c23TVSIV0edYEPGs2x3lW1g0W5XaCp4JPp-D3d_gXpdCbh7kC1FAp9NncCKYuO/exec";
 const COMPANY_IPS = ["43.226.232.126","43.227.24.78"];
 // ===== 主管 USER_ID（請填入你的主管 LINE userId）=====
 const MANAGERS = [
@@ -388,8 +388,8 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
     } else {
         Swal.fire({
             icon: "error",
-            title: "😥 今日已打卡",
-            html: "重複打卡",
+            title: "😥 打卡已更新",
+            html: "請查看今日打卡紀錄勿重複打卡",
             showConfirmButton: false,
              timer: 2000,
             backdrop: "rgba(0,0,0,0.5)"
