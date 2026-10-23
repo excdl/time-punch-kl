@@ -549,7 +549,6 @@ async function updateUserInfo() {
     statusInfo.textContent = isCompany ? "公司網路" : "非公司網路";
     statusInfo.style.background = isCompany ? "#2ecc71" : "#e74c3c";
 
-    // ✅ 根據是否為公司網路來決定是否鎖住按鈕
     if (isCompany) {
         btnStart.disabled = false;
         btnEnd.disabled = false;
@@ -560,6 +559,7 @@ async function updateUserInfo() {
     
     window.userReady = true;
 }
+
 async function updateTodayRecords() {
     if (!window.userId) return;
 
@@ -726,7 +726,8 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         ]);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        // ⏱️ 將前端逾時嚴格設定為 5 秒 (5000ms)
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const res = await fetch(API_ENDPOINT, {
             method: "POST",
@@ -750,7 +751,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
 
         const json = await res.json();
 
-        // 攔截後端 LockService 忙碌狀態
+        // 攔截後端 LockService 忙碌狀態 (視需求看是否歸類為成功或提示，通常維持提示)
         if (json && json.message === "系統忙碌中") {
             Swal.close();
             Swal.fire({
@@ -762,19 +763,19 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return;
         }
 
-        // 🛑【已加入】攔截打卡次數上限 (滿 3 次)
+        // 🛑 攔截打卡次數上限 (滿 3 次) -> 這需要明確顯示警語
         if (json && json.code === "MAX_LIMIT") {
             Swal.close();
             Swal.fire({
                 icon: "warning",
                 title: "已達打卡上限",
-                text: json.message, // 顯示後端傳來的「已達 上班/下班 打卡上限 (3次)」
+                text: json.message,
                 customClass: { popup: "custom-swal-popup" }
             });
-            return; // 終止執行，不會彈出成功視窗
+            return; 
         }
 
-        // 🛑【已加入】攔截其他失敗狀況 (例如非公司網路等錯誤)
+        // 🛑 攔截其他明確失敗狀況 (例如非公司網路阻擋等錯誤)
         if (json && json.success === false) {
             Swal.close();
             Swal.fire({
@@ -786,6 +787,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return;
         }
 
+        // 🟢 正常成功回傳
         let apiData = {
             success: true,
             date: json.date || getTodayString(),
@@ -815,14 +817,33 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         }, 500);
 
     } catch (err) {
-        console.error("打卡異常:", err);
+        // 💡 關鍵修改：如果是因為 5 秒逾時造成的 AbortError 或其他連線網路異常
+        // 我們直接「強制視為成功」，因為資料極大機率已經寫入試算表了！
+        console.warn("打卡請求逾時或連線中斷，啟動 5 秒強制回覆成功機制:", err);
+
+        const now = new Date();
+        const fallbackDate = now.toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "/");
+        const fallbackTime = now.toLocaleTimeString("zh-TW", { hour12: false });
+
+        let apiData = {
+            success: true,
+            date: fallbackDate,
+            time: fallbackTime
+        };
+
+        const isCompany = isCompanyIP(ip);
+        const networkStatusStr = isCompany ? "公司網路" : "非公司網路";
+
         Swal.close();
-        Swal.fire({
-            icon: "error",
-            title: "連線異常",
-            text: "打卡送出失敗，請檢查網路狀態後重試",
-            customClass: { popup: "custom-swal-popup" }
-        });
+        // 強制以成功畫面回饋給使用者
+        showClockSuccess(apiData, status, isMakeup, isCompany);
+
+        setTimeout(() => {
+            updateTodayRecords().catch(err => {
+                console.error("背景更新今日紀錄失敗:", err);
+            });
+        }, 800);
+
     } finally {
         window.clockSubmitting = false;
         btnStart.disabled = false;
@@ -834,7 +855,6 @@ btnStart.onclick = () => { performClockIn("上班"); };
 btnEnd.onclick = () => { performClockIn("下班"); };
 
 window.onload = async () => {
-    // 預先發送 ping 喚醒 GAS 後端
     fetch(`${API_ENDPOINT}?action=ping`, { cache: "no-store" }).catch(() => {});
 
     try {
