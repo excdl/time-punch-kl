@@ -423,21 +423,18 @@ function fixTimeFormat(t) {
 }
 
 function showClockLoading(status) {
-    let countdown = 5; // 設定預估秒數
+    let countdown = 5;
 
     Swal.fire({
         html: `
             <div style="padding: 20px 10px 10px 10px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
                 
-                <!-- 專業脈動圓環與置中倒數數字 -->
                 <div style="position: relative; width: 90px; height: 90px; margin: 0 auto 20px auto;">
-                    <!-- 外層進度軌道底色 -->
                     <div style="
                         position: absolute; top: 0; left: 0; width: 90px; height: 90px; 
                         border: 3px solid #f1f5f9; border-radius: 50%; box-sizing: border-box;
                     "></div>
 
-                    <!-- 內層旋轉動態進度環 -->
                     <div style="
                         position: absolute; top: 0; left: 0; width: 90px; height: 90px; 
                         border: 3px solid transparent; border-top-color: #2563eb; border-right-color: #3b82f6;
@@ -445,7 +442,6 @@ function showClockLoading(status) {
                         box-sizing: border-box;
                     "></div>
 
-                    <!-- 核心數字與呼吸燈光暈 -->
                     <div style="
                         position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                         display: flex; align-items: center; justify-content: center;
@@ -458,7 +454,6 @@ function showClockLoading(status) {
                     </div>
                 </div>
 
-                <!-- 狀態說明文字 -->
                 <h3 style="margin: 0 0 6px 0; color: #0f172a; font-size: 18px; font-weight: 600; letter-spacing: 0.3px;">
                     系統打卡處理中
                 </h3>
@@ -466,7 +461,6 @@ function showClockLoading(status) {
                     請稍後片刻勿關閉視窗
                 </p>
 
-                <!-- 底部微型科技進度條視覺 -->
                 <div style="width: 100%; max-width: 180px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 0 auto; overflow: hidden;">
                     <div style="width: 40%; height: 100%; background: #2563eb; border-radius: 2px; animation: proBarMove 1.5s ease-in-out infinite;"></div>
                 </div>
@@ -616,8 +610,14 @@ async function updateTodayRecords() {
     }
 }
 
-async function sendSelfMessage(record) {
-    if (!liff.isInClient()) return;
+/**
+ * 💡 優化後：具備自動重試機制的 LINE 訊息發送函式 (最多重試 2 次)
+ */
+async function sendSelfMessage(record, retries = 2) {
+    if (!liff.isInClient()) {
+        console.warn("目前不在 LINE App 內，無法使用 liff.sendMessages()");
+        return false;
+    }
 
     let headerColor = "#3498db";
     if (record.status === "下班") headerColor = "#2ecc71";
@@ -657,8 +657,16 @@ async function sendSelfMessage(record) {
                 }
             }
         }]);
+        console.log("LINE 訊息發送成功");
+        return true;
     } catch (err) {
-        console.error("LINE 訊息傳送失敗:", err);
+        console.error(`LINE 訊息傳送失敗（剩餘重試次數: ${retries}）:`, err);
+        
+        if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return sendSelfMessage(record, retries - 1);
+        }
+        return false;
     }
 }
 
@@ -726,7 +734,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         ]);
 
         const controller = new AbortController();
-        // ⏱️ 將前端逾時嚴格設定為 5 秒 (5000ms)
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const res = await fetch(API_ENDPOINT, {
@@ -751,7 +758,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
 
         const json = await res.json();
 
-        // 攔截後端 LockService 忙碌狀態 (視需求看是否歸類為成功或提示，通常維持提示)
         if (json && json.message === "系統忙碌中") {
             Swal.close();
             Swal.fire({
@@ -763,7 +769,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return;
         }
 
-        // 🛑 攔截打卡次數上限 (滿 3 次) -> 這需要明確顯示警語
         if (json && json.code === "MAX_LIMIT") {
             Swal.close();
             Swal.fire({
@@ -775,7 +780,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return; 
         }
 
-        // 🛑 攔截其他明確失敗狀況 (例如非公司網路阻擋等錯誤)
         if (json && json.success === false) {
             Swal.close();
             Swal.fire({
@@ -787,7 +791,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return;
         }
 
-        // 🟢 正常成功回傳
         let apiData = {
             success: true,
             date: json.date || getTodayString(),
@@ -800,6 +803,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         Swal.close();
         showClockSuccess(apiData, status, isMakeup, isCompany);
 
+        // 🛡️ 正常成功回傳時觸發訊息發送（帶有捕捉）
         sendSelfMessage({
             userName: window.userName,
             status: status,
@@ -807,7 +811,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             time: apiData.time,
             networkStatus: networkStatusStr
         }).catch(err => {
-            console.error("LINE 背景傳送失敗:", err);
+            console.error("LINE 背景傳送最終失敗:", err);
         });
 
         setTimeout(() => {
@@ -817,8 +821,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         }, 500);
 
     } catch (err) {
-        // 💡 關鍵修改：如果是因為 5 秒逾時造成的 AbortError 或其他連線網路異常
-        // 我們直接「強制視為成功」，因為資料極大機率已經寫入試算表了！
         console.warn("打卡請求逾時或連線中斷，啟動 5 秒強制回覆成功機制:", err);
 
         const now = new Date();
@@ -835,8 +837,18 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         const networkStatusStr = isCompany ? "公司網路" : "非公司網路";
 
         Swal.close();
-        // 強制以成功畫面回饋給使用者
         showClockSuccess(apiData, status, isMakeup, isCompany);
+
+        // 🛡️ 逾時強制的狀況下，也確保會發送 LINE 訊息
+        sendSelfMessage({
+            userName: window.userName,
+            status: status,
+            date: apiData.date,
+            time: apiData.time,
+            networkStatus: networkStatusStr
+        }).catch(err => {
+            console.error("LINE 背景傳送（Fallback）最終失敗:", err);
+        });
 
         setTimeout(() => {
             updateTodayRecords().catch(err => {
