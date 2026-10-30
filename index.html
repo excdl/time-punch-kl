@@ -338,10 +338,10 @@ button:not(:disabled):active {
 </div>
  
 <script>
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyfhgoFEyVaD_CuwkL41V523DeX_nF0UbMTFE0nPsDZzeKxLENYqTz8esg6BA-wgJVq/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby-NX6yT7ZALzqETcs6ieHFn6EWvtzRg0ESwHZNeVk47Q0swnP-IanpRrYfTnFl_wY/exec";
 const COMPANY_IPS  = [
     "220.133.168.54",
-    "27.242.0.72"
+    "27.242.10.207"
 ];
 
 const MANAGERS = [
@@ -423,18 +423,21 @@ function fixTimeFormat(t) {
 }
 
 function showClockLoading(status) {
-    let countdown = 5;
+    let countdown = 5; // 設定預估秒數
 
     Swal.fire({
         html: `
             <div style="padding: 20px 10px 10px 10px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
                 
+                <!-- 專業脈動圓環與置中倒數數字 -->
                 <div style="position: relative; width: 90px; height: 90px; margin: 0 auto 20px auto;">
+                    <!-- 外層進度軌道底色 -->
                     <div style="
                         position: absolute; top: 0; left: 0; width: 90px; height: 90px; 
                         border: 3px solid #f1f5f9; border-radius: 50%; box-sizing: border-box;
                     "></div>
 
+                    <!-- 內層旋轉動態進度環 -->
                     <div style="
                         position: absolute; top: 0; left: 0; width: 90px; height: 90px; 
                         border: 3px solid transparent; border-top-color: #2563eb; border-right-color: #3b82f6;
@@ -442,6 +445,7 @@ function showClockLoading(status) {
                         box-sizing: border-box;
                     "></div>
 
+                    <!-- 核心數字與呼吸燈光暈 -->
                     <div style="
                         position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                         display: flex; align-items: center; justify-content: center;
@@ -454,6 +458,7 @@ function showClockLoading(status) {
                     </div>
                 </div>
 
+                <!-- 狀態說明文字 -->
                 <h3 style="margin: 0 0 6px 0; color: #0f172a; font-size: 18px; font-weight: 600; letter-spacing: 0.3px;">
                     系統打卡處理中
                 </h3>
@@ -461,6 +466,7 @@ function showClockLoading(status) {
                     請稍後片刻勿關閉視窗
                 </p>
 
+                <!-- 底部微型科技進度條視覺 -->
                 <div style="width: 100%; max-width: 180px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 0 auto; overflow: hidden;">
                     <div style="width: 40%; height: 100%; background: #2563eb; border-radius: 2px; animation: proBarMove 1.5s ease-in-out infinite;"></div>
                 </div>
@@ -543,6 +549,7 @@ async function updateUserInfo() {
     statusInfo.textContent = isCompany ? "公司網路" : "非公司網路";
     statusInfo.style.background = isCompany ? "#2ecc71" : "#e74c3c";
 
+    // ✅ 根據是否為公司網路來決定是否鎖住按鈕
     if (isCompany) {
         btnStart.disabled = false;
         btnEnd.disabled = false;
@@ -553,7 +560,6 @@ async function updateUserInfo() {
     
     window.userReady = true;
 }
-
 async function updateTodayRecords() {
     if (!window.userId) return;
 
@@ -610,14 +616,8 @@ async function updateTodayRecords() {
     }
 }
 
-/**
- * 💡 優化後：具備自動重試機制的 LINE 訊息發送函式 (最多重試 2 次)
- */
-async function sendSelfMessage(record, retries = 2) {
-    if (!liff.isInClient()) {
-        console.warn("目前不在 LINE App 內，無法使用 liff.sendMessages()");
-        return false;
-    }
+async function sendSelfMessage(record) {
+    if (!liff.isInClient()) return;
 
     let headerColor = "#3498db";
     if (record.status === "下班") headerColor = "#2ecc71";
@@ -657,16 +657,8 @@ async function sendSelfMessage(record, retries = 2) {
                 }
             }
         }]);
-        console.log("LINE 訊息發送成功");
-        return true;
     } catch (err) {
-        console.error(`LINE 訊息傳送失敗（剩餘重試次數: ${retries}）:`, err);
-        
-        if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            return sendSelfMessage(record, retries - 1);
-        }
-        return false;
+        console.error("LINE 訊息傳送失敗:", err);
     }
 }
 
@@ -734,9 +726,9 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         ]);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-        const res = await fetch(API_ENDPOINT, {
+        const fetchPromise = fetch(API_ENDPOINT, {
             method: "POST",
             mode: "cors",
             redirect: "follow",
@@ -753,11 +745,20 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             })
         });
 
-        clearTimeout(timeoutId);
+        let res;
+        try {
+            res = await fetchPromise;
+            clearTimeout(timeoutId);
+        } catch (fetchErr) {
+            console.warn("fetch 逾時或中斷，啟動背景備援機制:", fetchErr);
+            throw fetchErr; // 拋出至外層 catch 啟動 Fallback
+        }
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const json = await res.json();
 
+        // 攔截後端 LockService 忙碌狀態
         if (json && json.message === "系統忙碌中") {
             Swal.close();
             Swal.fire({
@@ -769,6 +770,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return;
         }
 
+        // 🛑 攔截打卡次數上限 (滿 3 次)
         if (json && json.code === "MAX_LIMIT") {
             Swal.close();
             Swal.fire({
@@ -780,6 +782,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             return; 
         }
 
+        // 🛑 攔截其他明確失敗狀況
         if (json && json.success === false) {
             Swal.close();
             Swal.fire({
@@ -803,7 +806,6 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         Swal.close();
         showClockSuccess(apiData, status, isMakeup, isCompany);
 
-        // 🛡️ 正常成功回傳時觸發訊息發送（帶有捕捉）
         sendSelfMessage({
             userName: window.userName,
             status: status,
@@ -811,7 +813,7 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
             time: apiData.time,
             networkStatus: networkStatusStr
         }).catch(err => {
-            console.error("LINE 背景傳送最終失敗:", err);
+            console.error("LINE 背景傳送失敗:", err);
         });
 
         setTimeout(() => {
@@ -821,10 +823,12 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         }, 500);
 
     } catch (err) {
-        console.warn("打卡請求逾時或連線中斷，啟動 5 秒強制回覆成功機制:", err);
+        // 💡 發生 8 秒逾時（AbortError）或網路異常：啟動 Fallback 強制成功機制，防止漏打卡
+        console.warn("打卡逾時或網路中斷，啟動 Fallback 強制成功機制:", err);
+        Swal.close();
 
         const now = new Date();
-        const fallbackDate = now.toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "/");
+        const fallbackDate = getTodayString();
         const fallbackTime = now.toLocaleTimeString("zh-TW", { hour12: false });
 
         let apiData = {
@@ -836,30 +840,33 @@ async function performClockIn(status, customDate = "", customTime = "", isMakeup
         const isCompany = isCompanyIP(ip);
         const networkStatusStr = isCompany ? "公司網路" : "非公司網路";
 
-        Swal.close();
         showClockSuccess(apiData, status, isMakeup, isCompany);
 
-        // 🛡️ 逾時強制的狀況下，也確保會發送 LINE 訊息
+        // 🛡️ 逾時 Fallback 強制成功時，同步啟動重試機制發送 LINE 通知
         sendSelfMessage({
             userName: window.userName,
             status: status,
             date: apiData.date,
             time: apiData.time,
             networkStatus: networkStatusStr
-        }).catch(err => {
-            console.error("LINE 背景傳送（Fallback）最終失敗:", err);
-        });
+        }).catch(() => {});
 
+        // 💡 給予後端 1.5 秒緩衝時間寫入試算表後，再自動更新今日紀錄
         setTimeout(() => {
-            updateTodayRecords().catch(err => {
-                console.error("背景更新今日紀錄失敗:", err);
-            });
-        }, 800);
+            updateTodayRecords().catch(() => {});
+        }, 1500);
 
     } finally {
         window.clockSubmitting = false;
-        btnStart.disabled = false;
-        btnEnd.disabled = false;
+        // 恢復按鈕狀態（會根據是否為公司網路自動維持或解鎖）
+        const isCompany = isCompanyIP(ip);
+        if (isCompany) {
+            btnStart.disabled = false;
+            btnEnd.disabled = false;
+        } else {
+            btnStart.disabled = true;
+            btnEnd.disabled = true;
+        }
     }
 }
 
@@ -867,6 +874,7 @@ btnStart.onclick = () => { performClockIn("上班"); };
 btnEnd.onclick = () => { performClockIn("下班"); };
 
 window.onload = async () => {
+    // 預先發送 ping 喚醒 GAS 後端
     fetch(`${API_ENDPOINT}?action=ping`, { cache: "no-store" }).catch(() => {});
 
     try {
@@ -884,44 +892,4 @@ window.onload = async () => {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
